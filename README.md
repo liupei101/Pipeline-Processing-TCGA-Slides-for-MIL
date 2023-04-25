@@ -1,6 +1,6 @@
 # Pipeline-Processing-TCGA-Slides-for-MIL
 
-This repo provides the exhaustive pipeline of processing TCGA Whole-Slide Images for downstream Multiple Instance Learning (MIL), basically developed from CLAM (https://github.com/mahmoodlab/CLAM). 
+This repo provides an exhaustive pipeline of processing TCGA Whole-Slide Images for downstream Multiple Instance Learning (MIL), basically developed from CLAM (https://github.com/mahmoodlab/CLAM). 
 
 Feel free to post your issue in this repo if you encounter any problems with this repo.
 
@@ -16,5 +16,5 @@ What this repo could help you in analyzing Whole-Slide Images with MIL is as fol
 We thank CLAM's team [1] for contributing such an efficient and easy-to-use repo for WSI preprocessing, and TCGA [2] for making WSI data publicly-available to facilitate cancer research.
 
 ## Reference
-- Lu, M. Y.; Williamson, D. F.; Chen, T. Y.; Chen, R. J.; Barbieri, M.; and Mahmood, F. 2021. Data-efficient and weakly supervised computational pathology on whole-slide images. Nature biomedical engineering, 5(6): 555–570.
-- Kandoth, C.; McLellan, M. D.; Vandin, F.; Ye, K.; Niu, B.; Lu, C.; Xie, M.; Zhang, Q.; McMichael, J. F.; Wycza- lkowski, M. A.; Leiserson, M. D. M.; Miller, C. A.; Welch, J. S.; Walter, M. J.; Wendl, M. C.; Ley, T. J.; Wilson, R. K.; Raphael, B. J.; and Ding, L. 2013. Mutational landscape and significance across 12 major cancer types. Nature, 502: 333–339.
+- [1] Lu, M. Y.; Williamson, D. F.; Chen, T. Y.; Chen, R. J.; Barbieri, M.; and Mahmood, F. 2021. *Data-efficient and weakly supervised computational pathology on whole-slide images*. **Nature biomedical engineering**, 5(6): 555–570.
+- [2] Kandoth, C.; McLellan, M. D.; Vandin, F.; Ye, K.; Niu, B.; Lu, C.; Xie, M.; Zhang, Q.; McMichael, J. F.; Wycza- lkowski, M. A.; Leiserson, M. D. M.; Miller, C. A.; Welch, J. S.; Walter, M. J.; Wendl, M. C.; Ley, T. J.; Wilson, R. K.; Raphael, B. J.; and Ding, L. 2013. *Mutational landscape and significance across 12 major cancer types*. **Nature**, 502: 333–339.
