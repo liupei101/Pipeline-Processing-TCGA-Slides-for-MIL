@@ -7,9 +7,9 @@
 
 ## Overview
 
-This repo provides ***a complete and detailed tutorial*** for users who is is intending to ***process TCGA Whole-Slide Images (WSIs) for downstream computational tasks***, such as WSI classification and survival analysis (basically with multiple-instance learning (MIL) as the learning paradiagm). Most functionalities of this repo is inherented from [CLAM](https://github.com/mahmoodlab/CLAM). 
+This repo provides **a complete and detailed tutorial** for users who is is intending to **process TCGA Whole-Slide Images (WSIs) for downstream computational tasks**, such as WSI classification and survival analysis (basically with multiple-instance learning (MIL) as the learning paradiagm). Most functionalities of this repo is inherented from [CLAM](https://github.com/mahmoodlab/CLAM). 
 
-💡 A quick overview of **what convenience** this repo could provide for you is given as follows:
+💡 A quick overview of what convenience this repo could provide for you is given as follows:
 - **Step-by-step instructions to download complete TCGA data**, including WSIs and corresponding label of interest. This is not presented in CLAM.
 - **Detailed steps to process WSIs**, including WSI segmentation & patching and patch feature extraction. Notebooks are provided to show the details and notices that you need to pay attention to when using CLAM for WSI preprocessing.
 - **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), and [CONCH](https://github.com/mahmoodlab/CONCH).  
@@ -20,15 +20,14 @@ Feel free to post your issue in this repo if you encounter any problems.
 
 ## Walkthrough
 
-Here show you how to use this repo:
+👩‍💻 Here show you how to use this repo:
 - S01: [Downloading slides from TCGA websites](./S01-Downloading-Slides-from-TCGA.ipynb). It shows you, step by step, how to obtain the data you want from TCGA. 
 - S02: [Reorganizing slides at patient-level](./S02-Reorganizing-Slides-at-Patient-Level.ipynb). It provides the code for organizing slides at patient-level, and show you how to get the useful label data (slide-level) that you would possibly utilize in downstream computational tasks. 
 - S03: [Segmenting and patching slides](./S03-Segmenting-and-Patching-Slides.ipynb). It shows you the complete procedures and results of tissue segmentation and patching. Also, the basic knowledge of WSI structure is given.
 - S04: [Extracting patch features](./S04-Extracting-Patch-Features.ipynb). It shows you the complete procedures and results of patch feature extraction. 6+ pretained models are supported and can be easily used in this step. 
 
-
-Some notes:
-- It is strongly recommended to use *CONCH* in patch feature extraction (S04); if you cannot use CONCH due to limited access rights, *CTransPath and PLIP* are good alternatives (both are free for use). Their usage is provided in [scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tools/scripts). The truncated ResNet50 and ResNet18 w/ SimCL are NOT recommended for patch feature extraction. 
+📝 Some notes:
+- It is strongly recommended to use **CONCH** in patch feature extraction (S04); if you cannot use CONCH due to limited access rights, **CTransPath** and **PLIP** are good alternatives (both are free for use). Their usage is provided in [tools/scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tree/main/tools/scripts). The truncated ResNet50 and ResNet18 w/ SimCL are **NOT** recommended for patch feature extraction. 
 
 
 ## Acknowledgement
