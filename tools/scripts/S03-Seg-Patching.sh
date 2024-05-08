@@ -15,7 +15,7 @@ DIR_SAVE=/NAS02/ExpData/tcga_rcc
 cd ${DIR_REPO}
 
 echo "run seg & patching for all slides"
-CUDA_VISIBLE_DEVICES=1 python3 create_patches_fp.py \
+CUDA_VISIBLE_DEVICES=0 python3 create_patches_fp.py \
     --source ${DIR_READ} \
     --save_dir ${DIR_SAVE}/tiles-l${LEVEL}-s${SIZE} \
     --patch_size ${SIZE} \
@@ -23,4 +23,4 @@ CUDA_VISIBLE_DEVICES=1 python3 create_patches_fp.py \
     --preset tcga.csv \
     --patch_level ${LEVEL} \
     --seg --patch --stitch \
-    --no_auto_skip --in_child_dir
+    --in_child_dir

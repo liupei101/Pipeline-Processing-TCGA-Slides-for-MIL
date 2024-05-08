@@ -20,39 +20,42 @@ from utils.patch_sampler import sample_patches
 from utils.utils import color_normalization, color_augmentation, patch_gaussian_blur
 
 # only used after color normalization
-def colnor_followed_transforms(pretrained=False):
-	if pretrained:
+def colnor_followed_transforms(imagenet_pretrained=False):
+	if imagenet_pretrained:
 		mean = (0.485, 0.456, 0.406)
 		std = (0.229, 0.224, 0.225)
-
+		trnsfrms_val = transforms.Compose(
+			[
+			    transforms.Lambda(lambda x: x/255.0),
+			    transforms.Normalize(mean=mean, std=std)
+			]
+		)
 	else:
-		mean = (0.5,0.5,0.5)
-		std = (0.5,0.5,0.5)
-
-	trnsfrms_val = transforms.Compose(
-		[
-		    transforms.Lambda(lambda x: x/255.0),
-		    transforms.Normalize(mean=mean, std=std)
-		]
-	)
+		trnsfrms_val = transforms.Compose(
+			[
+			    transforms.Lambda(lambda x: x/255.0),
+			]
+		)
 
 	return trnsfrms_val
 
-def eval_transforms(pretrained=False):
-	if pretrained:
+def eval_transforms(imagenet_pretrained=False):
+	if imagenet_pretrained:
 		mean = (0.485, 0.456, 0.406)
 		std = (0.229, 0.224, 0.225)
+		trnsfrms_val = transforms.Compose(
+			[
+			 transforms.ToTensor(),
+			 transforms.Normalize(mean = mean, std = std)
+			]
+		)
 
 	else:
-		mean = (0.5,0.5,0.5)
-		std = (0.5,0.5,0.5)
-
-	trnsfrms_val = transforms.Compose(
-					[
-					 transforms.ToTensor(),
-					 transforms.Normalize(mean = mean, std = std)
-					]
-				)
+		trnsfrms_val = transforms.Compose(
+			[
+			 transforms.ToTensor(),
+			]
+		)
 
 	return trnsfrms_val
 
@@ -117,39 +120,53 @@ class Whole_Slide_Bag_FP(Dataset):
 	def __init__(self,
 		file_path,
 		wsi,
-		pretrained=False,
+		imagenet_pretrained=False,
 		custom_transforms=None,
 		custom_downsample=1,
 		target_patch_size=-1,
 		sampler_setting=None,
 		color_normalizer=None,
 		color_augmenter=None, 
-		add_patch_noise=None
+		add_patch_noise=None,
+		vertical_flip=False,
+		enable_direct_transforms=False,
 		):
 		"""
 		Args:
 			file_path (string): Path to the .h5 file containing patched data.
-			pretrained (bool): Use ImageNet transforms
+			imagenet_pretrained (bool): Use ImageNet transforms
 			custom_transforms (callable, optional): Optional transform to be applied on a sample
 			custom_downsample (int): Custom defined downscale factor (overruled by target_patch_size)
 			target_patch_size (int): Custom defined image size before embedding
 			sampler_setting (dict): Setting for sampling patches
 			color_normalizer (class): Normalize patches to the same color space
 			color_augmenter (class): Augment the color space of patch images
-			add_patch_noise (bool): Add noise to patch images
+			add_patch_noise (str): Add noise to patch images
+			vertical_flip (bool): Apply vertical flip to patch images
 		"""
-		self.pretrained=pretrained
+		self.imagenet_pretrained=imagenet_pretrained
 		self.wsi = wsi
 		self.sampler_setting = sampler_setting
 		self.color_normalizer = color_normalizer
 		self.color_augmenter = color_augmenter
 		self.add_patch_noise = add_patch_noise
+		self.vertical_flip = vertical_flip
+		self.enable_direct_transforms = enable_direct_transforms
 		if self.color_normalizer is not None:
-			self.roi_transforms = colnor_followed_transforms(pretrained=pretrained)
-		elif not custom_transforms:
-			self.roi_transforms = eval_transforms(pretrained=pretrained)
+			self.roi_transforms = colnor_followed_transforms(imagenet_pretrained=imagenet_pretrained)
+		elif custom_transforms is None:
+			self.roi_transforms = eval_transforms(imagenet_pretrained=imagenet_pretrained)
 		else:
 			self.roi_transforms = custom_transforms
+			from transformers.models.clip.processing_clip import CLIPProcessor
+			if isinstance(self.roi_transforms, CLIPProcessor):
+				self.hugging_face_format = True
+			else:
+				self.hugging_face_format = False
+
+		if self.enable_direct_transforms:
+			assert custom_transforms is not None, "Please specify your custom transforms when enabling direct transform."
+			print("[warning] in a mode of direct transforming with custom_transforms")
 
 		self.file_path = file_path
 
@@ -187,19 +204,32 @@ class Whole_Slide_Bag_FP(Dataset):
 
 		print('\nfeature extraction settings:')
 		print('-- target patch size: ', self.target_patch_size)
-		print('-- pretrained: ', self.pretrained)
+		print('-- imagenet_pretrained: ', self.imagenet_pretrained)
 		print('-- patches sampler:', self.sampler_setting)
 		print('-- color normalization:', self.color_normalizer)
 		print('-- color argmentation:', self.color_augmenter)
 		print('-- add_patch_noise:', self.add_patch_noise)
+		print('-- vertical_flip:', self.vertical_flip)
 		print('-- transformations: ', self.roi_transforms)
+		print('-- enable direct transform: ', self.enable_direct_transforms)
 
 	def __getitem__(self, idx):
 		coord = self.coords[idx]
 		img = self.wsi.read_region(coord, self.patch_level, (self.patch_size, self.patch_size)).convert('RGB')
 
+		if self.enable_direct_transforms:
+			if self.hugging_face_format:
+				res = self.roi_transforms(images=img, return_tensors="pt")
+				img = res['pixel_values'][0].unsqueeze(0)
+			else:
+				img = self.roi_transforms(img).unsqueeze(0)
+			return img, coord
+
 		if self.target_patch_size is not None:
 			img = img.resize(self.target_patch_size)
+
+		if self.vertical_flip is True:
+			img = img.transpose(Image.FLIP_TOP_BOTTOM)
 
 		if self.color_normalizer is not None:
 			img = np.array(img).astype(np.uint8)

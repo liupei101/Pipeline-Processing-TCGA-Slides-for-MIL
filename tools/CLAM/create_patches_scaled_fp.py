@@ -59,6 +59,7 @@ def process_patches(path_patchi, path_patcho, patch_scale):
 
     scaled_coords = scaled_coords[1:] # ignore the first row
     scaled_attrs['save_path'] = osp.dirname(path_patcho)
+    scaled_coords = scaled_coords.astype(np.int64)
     save_hdf5(path_patcho, {'coords': scaled_coords}, {'coords': scaled_attrs}, mode='w')
 
 def create_patches(input_dir, path_process_list, save_dir, patch_scale, auto_skip=False):
@@ -83,6 +84,7 @@ def create_patches(input_dir, path_process_list, save_dir, patch_scale, auto_ski
             continue
 
         process_patches(path_origin_patch, path_save_patch, patch_scale)
+        print(f"processed scaled patches and saved to {path_save_patch}.")
 
 def process_stitch(path_wsi, path_patch, path_save):
     """

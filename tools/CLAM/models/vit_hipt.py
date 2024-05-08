@@ -49,26 +49,26 @@ def get_vit256(ckpt_from, arch='vit_small'):
     return model256
 
 def eval_transforms():
-	"""
-	"""
-	mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
-	eval_t = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean = mean, std = std)])
-	return eval_t
+    """
+    """
+    mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+    eval_t = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean = mean, std = std)])
+    return eval_t
 
 
 def roll_batch2img(batch: torch.Tensor, w: int, h: int, patch_size=256):
-	"""
-	Rolls an image tensor batch (batch of [256 x 256] images) into a [W x H] Pil.Image object.
-	
-	Args:
-		batch (torch.Tensor): [B x 3 x 256 x 256] image tensor batch.
-		
-	Return:
-		Image.PIL: [W x H X 3] Image.
-	"""
-	batch = batch.reshape(w, h, 3, patch_size, patch_size)
-	img = rearrange(batch, 'p1 p2 c w h-> c (p1 w) (p2 h)').unsqueeze(dim=0)
-	return Image.fromarray(tensorbatch2im(img)[0])
+    """
+    Rolls an image tensor batch (batch of [256 x 256] images) into a [W x H] Pil.Image object.
+    
+    Args:
+        batch (torch.Tensor): [B x 3 x 256 x 256] image tensor batch.
+        
+    Return:
+        Image.PIL: [W x H X 3] Image.
+    """
+    batch = batch.reshape(w, h, 3, patch_size, patch_size)
+    img = rearrange(batch, 'p1 p2 c w h-> c (p1 w) (p2 h)').unsqueeze(dim=0)
+    return Image.fromarray(tensorbatch2im(img)[0])
 
 
 def tensorbatch2im(input_image, imtype=np.uint8):

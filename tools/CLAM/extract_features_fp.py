@@ -8,8 +8,8 @@ import pdb
 import time
 from datasets.dataset_h5 import Dataset_All_Bags, Whole_Slide_Bag_FP
 from torch.utils.data import DataLoader
+from torchvision import transforms
 from models.resnet_custom import resnet50_baseline, resnet50_full, resnet50_MoCo, resnet18_ST
-from models.vit_hipt import get_vit256
 import argparse
 from utils.utils import print_network, collate_features
 from utils.utils import get_slide_id, get_slide_fullpath
@@ -20,35 +20,47 @@ import h5py
 import openslide
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-def compute_w_loader(file_path, output_path, wsi, model,
-    batch_size = 8, verbose = 0, print_every=20, pretrained=True, 
-    custom_downsample=1, target_patch_size=-1, sampler_setting=None, 
-    color_normalizer=None, color_augmenter=None, add_patch_noise=None, save_h5_path=None):
+def compute_w_loader(arch, file_path, output_path, wsi, model,
+    batch_size = 8, verbose = 0, print_every=20, imagenet_pretrained=True, 
+    custom_downsample=1, target_patch_size=-1, sampler_setting=None, custom_transforms=None,
+    color_normalizer=None, color_augmenter=None, add_patch_noise=None, vertical_flip=False, 
+    enable_direct_transforms=False, save_h5_path=None, **kws):
     """
     args:
+        arch: the name of model to use
         file_path: directory of bag (.h5 file)
         output_path: directory to save computed features (.h5 file)
         model: pytorch model
         batch_size: batch_size for computing features in batches
         verbose: level of feedback
-        pretrained: use weights pretrained on imagenet
+        imagenet_pretrained: use weights pretrained on imagenet
         custom_downsample: custom defined downscale factor of image patches
         target_patch_size: custom defined, rescaled image size before embedding
         sampler_setting: custom defined, samlping settings
+        custom_transforms: custom defined, used to transform images, e.g., mean and std normalization.
         color_normalizer: normalization for color space of pathology images
         color_augmenter: color augmentation for patch images
         add_patch_noise: adding noise to patch images
+        enable_direct_transforms: only using custom transforms for patch images 
         save_h5_path: path to save features as h5 files
     """
-    dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, pretrained=pretrained, 
+    dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, imagenet_pretrained=imagenet_pretrained, 
         custom_downsample=custom_downsample, target_patch_size=target_patch_size, 
         sampler_setting=sampler_setting, color_normalizer=color_normalizer, 
-        color_augmenter=color_augmenter, add_patch_noise=add_patch_noise)
+        color_augmenter=color_augmenter, add_patch_noise=add_patch_noise, 
+        vertical_flip=vertical_flip, custom_transforms=custom_transforms, enable_direct_transforms=enable_direct_transforms)
     kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}   #num_workers 4->0
     loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features)
 
     if verbose > 0:
         print('processing {}: total of {} batches'.format(file_path,len(loader)))
+
+    proj_to_contrast = None if 'proj_to_contrast' not in kws else kws['proj_to_contrast']
+    if proj_to_contrast is not None:
+        if not proj_to_contrast:
+            print("[warning] Image features will not be projected into VL contrastive space.")
+        else:
+            print("[info] Image features will be projected into VL contrastive space.")
 
     all_feats = None
     all_coors = None
@@ -60,7 +72,26 @@ def compute_w_loader(file_path, output_path, wsi, model,
             batch = batch.to(device, non_blocking=True)
             mini_bs = coords.shape[0]
             
-            features = model(batch).cpu()
+            if arch == 'CONCH':
+                features = model.encode_image(
+                    batch, 
+                    proj_contrast=proj_to_contrast, # if use the image features in VL-contrastive space
+                    normalize=False
+                ).cpu() 
+            elif arch == 'CLIP' or arch == 'PLIP':
+                features = hf_clip_encoder_image(
+                    model, 
+                    batch, 
+                    proj_contrast=proj_to_contrast  # if use the image features in VL-contrastive space
+                ).cpu()
+            elif arch == 'OGCLIP':
+                features = model.encode_image(
+                    batch,
+                    proj_contrast=proj_to_contrast  # if use the image features in VL-contrastive space
+                ).cpu()
+            else:
+                features = model(batch).cpu()
+            
             if all_feats is None:
                 all_feats = features
                 all_coors = coords
@@ -80,9 +111,35 @@ def compute_w_loader(file_path, output_path, wsi, model,
     
     return output_path
 
+@torch.no_grad()
+def hf_clip_encoder_image(hf_clip, batch, proj_contrast=True):
+    """
+    This follows the implementation of HuggingFace - transformers
+    """
+    # Use CLIP model's config for some fields (if specified) instead of those of vision & text components.
+    output_attentions = hf_clip.config.output_attentions
+    output_hidden_states = (hf_clip.config.output_hidden_states)
+    return_dict = hf_clip.config.use_return_dict
+
+    vision_outputs = hf_clip.vision_model(
+        pixel_values=batch,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    pooled_output = vision_outputs[1]  # pooled_output
+    
+    if proj_contrast:
+        image_features = hf_clip.visual_projection(pooled_output)
+    else:
+        image_features = pooled_output
+
+    return image_features
+
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
-parser.add_argument('--arch', type=str, default='RN50-B', help='Choose which architecture to use for extracting features.')
+parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH'], help='Choose which architecture to use for extracting features.')
 parser.add_argument('--ckpt_path', type=str, default=None, help='The checkpoint path for pretrained models.')
 parser.add_argument('--data_h5_dir', type=str, default=None)
 parser.add_argument('--data_slide_dir', type=str, default=None)
@@ -90,8 +147,9 @@ parser.add_argument('--slide_ext', type=str, default= '.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
 parser.add_argument('--batch_size', type=int, default=256)
-parser.add_argument('--no_auto_skip', default=False, action='store_true')
+parser.add_argument('--auto_skip', default=False, action='store_true')
 parser.add_argument('--custom_downsample', type=int, default=1)
+parser.add_argument('--init_patch_size', type=int, default=256)
 parser.add_argument('--target_patch_size', type=int, default=-1)
 parser.add_argument('--slide_in_child_dir', default=False, action='store_true')
 parser.add_argument('--sampler', default=None, type=str)
@@ -103,7 +161,10 @@ parser.add_argument('--cnorm_template', default='x20-256', type=str, help='use x
 parser.add_argument('--cnorm_method', default='macenko', type=str, help='macenko or vahadane')
 parser.add_argument('--color_aug', default=None, type=str, help='Applying color augmentation to patch images.')
 parser.add_argument('--patch_noise', default=None, type=str, help='Applying Guassian Blur to patch images.')
+parser.add_argument('--vertical_flip', default=False, action='store_true', help='Applying Vertical Flip to patch images.')
 parser.add_argument('--save_h5', default=False, action='store_true')
+parser.add_argument('--proj_to_contrast', type=str, default='Y', choices=['Y', 'N'], help='If projecting image features into VL contrast space.')
+parser.add_argument('--clip_type', default='ViT-B/32', type=str, help='used for specifying the CLIP model.')
 args = parser.parse_args()
 
 
@@ -140,7 +201,10 @@ if __name__ == '__main__':
         color_augmenter = get_color_augmenter(args.color_aug)
 
     print('loading model checkpoint of arch {} from {}'.format(args.arch, args.ckpt_path))
-    args_pretrained = True
+    args_imagenet_pretrained = True
+    args_custom_transforms = None
+    args_enable_direct_transforms = False
+    args_proj_to_contrast = args.proj_to_contrast == 'Y'
     if args.arch == 'RN50-B':
         model = resnet50_baseline(pretrained=True)
     elif args.arch == 'RN50-F':
@@ -151,13 +215,75 @@ if __name__ == '__main__':
         model = resnet50_MoCo('full', ckpt_from=args.ckpt_path) # 2048-d from layer4 of ResNet50
     elif args.arch == 'RN18-SimCL':
         model = resnet18_ST(ckpt_from=args.ckpt_path) # 512-d from layer4 of ResNet18
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        print(f"[warning] Due to the use of {args.arch}, your color_normalizer and patch sampler are forced to be None, not active.")
     elif args.arch == 'ViT256-HIPT':
+        from models.vit_hipt import get_vit256
         model = get_vit256(ckpt_from=args.ckpt_path) # 384-d from ViT-Small
         color_normalizer = None
-        args_pretrained = False
+        args_imagenet_pretrained = False
         args_sampler = None
+        print(f"[warning] Due to the use of {args.arch}, your color_normalizer and patch sampler are forced to be None, not active.")
+    elif args.arch == 'CTransPath':
+        from models.ctran import ctranspath
+        model = ctranspath(ckpt_from=args.ckpt_path) # 768-d from CTransPath
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_custom_transforms = transforms.Compose([
+            transforms.ToPILImage(mode='RGB'),
+            transforms.Resize(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = (0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))
+        ])
+        print(f"[warning] Due to the use of {args.arch}, your color_normalizer and patch sampler are forced to be None, not active.")
+    elif args.arch == 'OGCLIP':
+        from models import clip
+        model, preprocess = clip.load(args.clip_type, device=device, download_root=args.ckpt_path) # "ViT-B/32"
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_enable_direct_transforms = True
+        args_custom_transforms = preprocess
+        print(f"[warning] Due to the use of {args.arch}-{args.clip_type}, only using custom transforms and all other arguments are not active.")
+    elif args.arch == 'CLIP':
+        from transformers import CLIPProcessor, CLIPModel
+        model = CLIPModel.from_pretrained(args.ckpt_path)
+        processor = CLIPProcessor.from_pretrained(args.ckpt_path)
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_enable_direct_transforms = True
+        args_custom_transforms = processor
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
+    elif args.arch == 'PLIP':
+        from transformers import CLIPProcessor, CLIPModel
+        model = CLIPModel.from_pretrained(args.ckpt_path)
+        processor = CLIPProcessor.from_pretrained(args.ckpt_path)
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_enable_direct_transforms = True
+        args_custom_transforms = processor
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
+    elif args.arch == 'CONCH':
+        from models.conch import create_model_from_pretrained
+        model, preprocess = create_model_from_pretrained(
+            "conch_ViT-B-16", 
+            checkpoint_path=args.ckpt_path,
+            force_image_size=args.init_patch_size,
+        )
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_enable_direct_transforms = True
+        args_custom_transforms = preprocess
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     else:
         raise NotImplementedError("Please specify a valid architecture.")
+
     model = model.to(device)
     
     # print_network(model)
@@ -182,7 +308,7 @@ if __name__ == '__main__':
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
 
-        if not args.no_auto_skip and slide_id+'.pt' in dest_files:
+        if args.auto_skip and slide_id+'.pt' in dest_files:
             print('skipped {}'.format(slide_id))
             continue 
 
@@ -194,8 +320,12 @@ if __name__ == '__main__':
         
         time_start = time.time()
         wsi = openslide.open_slide(slide_file_path)
-        output_file_path = compute_w_loader(h5_file_path, output_pt_path, wsi, 
-        model = model, batch_size = args.batch_size, verbose = 1, print_every = 20, pretrained=args_pretrained,
-        custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size, sampler_setting=args_sampler,                         color_normalizer=color_normalizer, color_augmenter=color_augmenter, add_patch_noise=args.patch_noise, save_h5_path=output_h5_path)
+        output_file_path = compute_w_loader(args.arch, h5_file_path, output_pt_path, wsi, 
+            model = model, batch_size = args.batch_size, verbose = 1, print_every = 20, imagenet_pretrained=args_imagenet_pretrained,
+            custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size, sampler_setting=args_sampler,
+            custom_transforms=args_custom_transforms, color_normalizer=color_normalizer, color_augmenter=color_augmenter,
+            add_patch_noise=args.patch_noise, vertical_flip=args.vertical_flip, enable_direct_transforms=args_enable_direct_transforms,
+            save_h5_path=output_h5_path, proj_to_contrast=args_proj_to_contrast
+        )
         time_elapsed = time.time() - time_start
         print('\ncomputing features for {} took {} s'.format(output_file_path, time_elapsed))

@@ -16,12 +16,11 @@ DIR_EXP_DATA=/NAS02/ExpData/tcga_rcc
 SUBDIR_READ=tiles-l${LEVEL}-s${SIZE}
 
 # Arch to be used for patch feature extraction (CONCH is strongly recommended)
-ARCH=CONCH
+ARCH=PLIP
 
 # Model path
-# You need to first apply for its access rights via https://huggingface.co/MahmoodLab/CONCH
-# and then download a model file named `pytorch_model.bin`.
-MODEL_CKPT=/path/to/conch/pytorch_model.bin
+# You need to download the whole project from https://huggingface.co/vinid/plip
+MODEL_CKPT=/path/to/vinid/plip
 
 # Sub-directory to the patch features 
 SUBDIR_SAVE=feats-l${LEVEL}-s${SIZE}-${ARCH}

@@ -16,12 +16,12 @@ DIR_EXP_DATA=/NAS02/ExpData/tcga_rcc
 SUBDIR_READ=tiles-l${LEVEL}-s${SIZE}
 
 # Arch to be used for patch feature extraction (CONCH is strongly recommended)
-ARCH=CONCH
+ARCH=CTransPath
 
-# Model path
-# You need to first apply for its access rights via https://huggingface.co/MahmoodLab/CONCH
-# and then download a model file named `pytorch_model.bin`.
-MODEL_CKPT=/path/to/conch/pytorch_model.bin
+# Model path 
+# You need to download it from https://drive.google.com/file/d/1DoDx_70_TLj98gTf6YTXnu4tFhsFocDX/view?usp=sharing
+# and then name it as `ctranspath.pth`.
+MODEL_CKPT=/path/to/ctranspath/ctranspath.pth
 
 # Sub-directory to the patch features 
 SUBDIR_SAVE=feats-l${LEVEL}-s${SIZE}-${ARCH}
@@ -38,5 +38,4 @@ CUDA_VISIBLE_DEVICES=0 python3 extract_features_fp.py \
     --feat_dir ${DIR_EXP_DATA}/${SUBDIR_SAVE} \
     --batch_size 128 \
     --slide_ext .svs \
-    --slide_in_child_dir \
-    --proj_to_contrast N
+    --slide_in_child_dir
