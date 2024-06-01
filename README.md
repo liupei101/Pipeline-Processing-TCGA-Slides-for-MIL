@@ -10,12 +10,12 @@
 
 This repo provides **a complete and detailed tutorial** for users who intend to **process TCGA Whole-Slide Images (WSIs) for downstream computational tasks**, such as WSI classification and survival analysis (basically with multiple-instance learning (MIL) as the learning paradigm). 
 
-Moreover, this repo also provides [an improved version](./tools/CLAM) of original [CLAM](https://github.com/mahmoodlab/CLAM). This improvoed version has more practical features, e.g., 
+🔥 Moreover, this repo also provides [an improved version](./tools/CLAM) of original [CLAM](https://github.com/mahmoodlab/CLAM). This improvoed version has more practical features: 
 - allowing users to **specify a unified magnification** for patching and feature extractiong,
 - **patch-level image transformations** for model rubostness test, e.g. Gaussian bluring and stain variation.
 - **diverse architectures / networks** for patch feature extracting
 
-💡 A quick overview of what convenience this repo could provide for you is given as follows:
+💡 A quick overview of what convenience this repo could provide for you:
 - **Step-by-step instructions to download complete TCGA data**, including WSIs and corresponding label of interest. This is not presented in CLAM.
 - **Detailed steps to process WSIs**, including WSI segmentation & patching and patch feature extraction. Two notebooks are given to show the details that need to be noticed when using CLAM for WSI preprocessing.
 - **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), and [CONCH](https://github.com/mahmoodlab/CONCH).  
