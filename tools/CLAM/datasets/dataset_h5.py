@@ -19,45 +19,21 @@ from random import randrange
 from utils.patch_sampler import sample_patches
 from utils.utils import color_normalization, color_augmentation, patch_gaussian_blur
 
-# only used after color normalization
-def colnor_followed_transforms(imagenet_pretrained=False):
-	if imagenet_pretrained:
-		mean = (0.485, 0.456, 0.406)
-		std = (0.229, 0.224, 0.225)
-		trnsfrms_val = transforms.Compose(
-			[
-			    transforms.Lambda(lambda x: x/255.0),
-			    transforms.Normalize(mean=mean, std=std)
-			]
-		)
-	else:
-		trnsfrms_val = transforms.Compose(
-			[
-			    transforms.Lambda(lambda x: x/255.0),
-			]
-		)
+
+func_ToPILImage = transforms.ToPILImage(mode='RGB')
+
+def eval_transforms(*args, **kwargs):
+	mean = (0.485, 0.456, 0.406)
+	std = (0.229, 0.224, 0.225)
+	trnsfrms_val = transforms.Compose(
+		[
+			transforms.ToTensor(),
+			transforms.Normalize(mean = mean, std = std)
+		]
+	)
 
 	return trnsfrms_val
 
-def eval_transforms(imagenet_pretrained=False):
-	if imagenet_pretrained:
-		mean = (0.485, 0.456, 0.406)
-		std = (0.229, 0.224, 0.225)
-		trnsfrms_val = transforms.Compose(
-			[
-			 transforms.ToTensor(),
-			 transforms.Normalize(mean = mean, std = std)
-			]
-		)
-
-	else:
-		trnsfrms_val = transforms.Compose(
-			[
-			 transforms.ToTensor(),
-			]
-		)
-
-	return trnsfrms_val
 
 class Whole_Slide_Bag(Dataset):
 	def __init__(self,
@@ -79,7 +55,7 @@ class Whole_Slide_Bag(Dataset):
 			self.target_patch_size = None
 
 		if not custom_transforms:
-			self.roi_transforms = eval_transforms(pretrained=pretrained)
+			self.roi_transforms = eval_transforms()
 		else:
 			self.roi_transforms = custom_transforms
 
@@ -129,7 +105,6 @@ class Whole_Slide_Bag_FP(Dataset):
 		color_augmenter=None, 
 		add_patch_noise=None,
 		vertical_flip=False,
-		enable_direct_transforms=False,
 		):
 		"""
 		Args:
@@ -151,11 +126,9 @@ class Whole_Slide_Bag_FP(Dataset):
 		self.color_augmenter = color_augmenter
 		self.add_patch_noise = add_patch_noise
 		self.vertical_flip = vertical_flip
-		self.enable_direct_transforms = enable_direct_transforms
-		if self.color_normalizer is not None:
-			self.roi_transforms = colnor_followed_transforms(imagenet_pretrained=imagenet_pretrained)
-		elif custom_transforms is None:
-			self.roi_transforms = eval_transforms(imagenet_pretrained=imagenet_pretrained)
+		
+		if custom_transforms is None:
+			self.roi_transforms = eval_transforms()
 		else:
 			self.roi_transforms = custom_transforms
 			from transformers.models.clip.processing_clip import CLIPProcessor
@@ -164,10 +137,8 @@ class Whole_Slide_Bag_FP(Dataset):
 			else:
 				self.hugging_face_format = False
 
-		if self.enable_direct_transforms:
-			assert custom_transforms is not None, "Please specify your custom transforms when enabling direct transform."
-			print("[warning] in a mode of direct transforming with custom_transforms")
-
+		self.pixel_operation = self.color_normalizer is None and self.color_augmenter is None and self.add_patch_noise is None
+		
 		self.file_path = file_path
 
 		with h5py.File(self.file_path, "r") as f:
@@ -211,41 +182,43 @@ class Whole_Slide_Bag_FP(Dataset):
 		print('-- add_patch_noise:', self.add_patch_noise)
 		print('-- vertical_flip:', self.vertical_flip)
 		print('-- transformations: ', self.roi_transforms)
-		print('-- enable direct transform: ', self.enable_direct_transforms)
 
 	def __getitem__(self, idx):
 		coord = self.coords[idx]
 		img = self.wsi.read_region(coord, self.patch_level, (self.patch_size, self.patch_size)).convert('RGB')
-
-		if self.enable_direct_transforms:
-			if self.hugging_face_format:
-				res = self.roi_transforms(images=img, return_tensors="pt")
-				img = res['pixel_values'][0].unsqueeze(0)
-			else:
-				img = self.roi_transforms(img).unsqueeze(0)
-			return img, coord
-
-		if self.target_patch_size is not None:
+		
+		# Resize image first according to the specified target patch size
+		if self.target_patch_size is not None and self.target_patch_size != self.patch_size:
 			img = img.resize(self.target_patch_size)
 
 		if self.vertical_flip is True:
 			img = img.transpose(Image.FLIP_TOP_BOTTOM)
 
-		if self.color_normalizer is not None:
-			img = np.array(img).astype(np.uint8)
-			img = color_normalization(img, self.color_normalizer)
-		elif self.color_augmenter is not None:
-			img = np.array(img).astype(np.uint8)
-			img = color_augmentation(img, self.color_augmenter)
+		if self.pixel_operation:
+			# cast as np ndarray for the operations on image pixels
+			img = np.asarray(img).astype(np.uint8)
+			
+			if self.color_normalizer is not None:
+				img = color_normalization(img, self.color_normalizer)
+			elif self.color_augmenter is not None:
+				img = color_augmentation(img, self.color_augmenter)
+			else:
+				pass
+
+			if self.add_patch_noise is not None:
+				img = patch_gaussian_blur(img, self.add_patch_noise)
+			
+			# NOTE: restore PIL.Image for running custom transforms
+			img = func_ToPILImage(img)
+		
+		if self.hugging_face_format:
+			res = self.roi_transforms(images=img, return_tensors="pt")
+			img = res['pixel_values'][0].unsqueeze(0)
 		else:
-			img = np.array(img).astype(np.uint8)
-
-		if self.add_patch_noise is not None:
-			img = patch_gaussian_blur(img, self.add_patch_noise)
-
-		img = self.roi_transforms(img).unsqueeze(0)
+			img = self.roi_transforms(img).unsqueeze(0)
 
 		return img, coord
+
 
 class Dataset_All_Bags(Dataset):
 

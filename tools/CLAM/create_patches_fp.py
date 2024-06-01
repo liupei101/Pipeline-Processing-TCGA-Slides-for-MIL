@@ -11,6 +11,8 @@ import argparse
 import pdb
 import pandas as pd
 
+EPS = 1e-5
+
 def stitching(file_path, wsi_object, downscale = 64):
 	start = time.time()
 	heatmap = StitchCoords(file_path, wsi_object, downscale=downscale, bg_color=(0,0,0), alpha=-1, draw_grid=False)
@@ -48,7 +50,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				  filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8}, 
 				  vis_params = {'vis_level': -1, 'line_thickness': 500},
 				  patch_params = {'use_padding': True, 'contour_fn': 'four_pt'},
-				  patch_level = 0,
+				  patch_magnification = 20,
 				  use_default_params = False, 
 				  seg = False, save_mask = True, 
 				  stitch= False, 
@@ -60,7 +62,6 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 	
 	if process_list is None:
 		df = initialize_df(slides, seg_params, filter_params, vis_params, patch_params)
-	
 	else:
 		df = pd.read_csv(process_list)
 		df = initialize_df(df, seg_params, filter_params, vis_params, patch_params)
@@ -72,12 +73,21 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 	legacy_support = 'a' in df.keys()
 	if legacy_support:
-		print('detected legacy segmentation csv file, legacy support enabled')
+		print('[info] detected legacy segmentation csv file, legacy support enabled')
 		df = df.assign(**{'a_t': np.full((len(df)), int(filter_params['a_t']), dtype=np.uint32),
 		'a_h': np.full((len(df)), int(filter_params['a_h']), dtype=np.uint32),
 		'max_n_holes': np.full((len(df)), int(filter_params['max_n_holes']), dtype=np.uint32),
 		'line_thickness': np.full((len(df)), int(vis_params['line_thickness']), dtype=np.uint32),
 		'contour_fn': np.full((len(df)), patch_params['contour_fn'])})
+
+	# NEW: record more information 
+    # magnification: the highest magnification of the slide (level=0)
+    # seg_ref_size: the default ref patch size (level=0) used in segmentation
+    # patch_ref_size: the ref patch size (level=0) used in patching
+    # patch_ref_step: the ref patch size (level=0) used in patching
+    for new_k in ['magnification', 'seg_ref_size', 'patch_ref_size', 'patch_ref_step']:
+        if new_k not in df.columns:
+            df.loc[:, new_k] = -1
 
 	seg_times = 0.
 	patch_times = 0.
@@ -101,6 +111,23 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		# Inialize WSI
 		full_path = get_slide_fullpath(source, slide, in_child_dir)
 		WSI_object = WholeSlideImage(full_path)
+		mag = WSI_object.magnification
+
+		# NEW: update slide DataFrame
+		df.loc[idx, 'magnification'] = mag
+		if mag != -1:
+			downsample_level = 40 // mag
+			df.loc[idx, 'seg_ref_size'] = 512 // downsample_level
+
+			patch_downsample_level = mag / patch_magnification
+			df.loc[idx, 'patch_ref_size'] = int(patch_downsample_level * patch_size + EPS)
+			df.loc[idx, 'patch_ref_step'] = int(patch_downsample_level * step_size + EPS)
+		else:
+			# by default at 40x if mag is N/A
+			df.loc[idx, 'seg_ref_size'] = 512
+			patch_downsample_level = 40 / patch_magnification
+			df.loc[idx, 'patch_ref_size'] = int(patch_downsample_level * patch_size + EPS)
+			df.loc[idx, 'patch_ref_step'] = int(patch_downsample_level * step_size + EPS)
 
 		if use_default_params:
 			current_vis_params = vis_params.copy()
@@ -141,7 +168,6 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		if current_vis_params['vis_level'] < 0:
 			if len(WSI_object.level_dim) == 1:
 				current_vis_params['vis_level'] = 0
-			
 			else:	
 				wsi = WSI_object.getOpenSlide()
 				best_level = wsi.get_best_level_for_downsample(64)
@@ -150,7 +176,6 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		if current_seg_params['seg_level'] < 0:
 			if len(WSI_object.level_dim) == 1:
 				current_seg_params['seg_level'] = 0
-			
 			else:
 				wsi = WSI_object.getOpenSlide()
 				best_level = wsi.get_best_level_for_downsample(64)
@@ -179,6 +204,10 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		df.loc[idx, 'vis_level'] = current_vis_params['vis_level']
 		df.loc[idx, 'seg_level'] = current_seg_params['seg_level']
 
+		# NEW: update parameters for segmentation
+		current_seg_params['ref_patch_size'] = df.loc[idx, 'seg_ref_size']
+		if current_seg_params['ref_patch_size'] != 512:
+			print(f"[info] `ref_patch_size`, 512 by default for seg, is {df.loc[idx, 'seg_ref_size']} as magnification = {mag}x.")
 
 		seg_time_elapsed = -1
 		if seg:
@@ -189,9 +218,15 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 			mask_path = os.path.join(mask_save_dir, slide_id+'.jpg')
 			mask.save(mask_path)
 
+		# NEW: update parameters for patching
+		cur_patch_size = df.loc[idx, 'patch_ref_size']
+		cur_step_size = df.loc[idx, 'patch_ref_step']
+		if cur_patch_size != patch_size:
+			print(f"[info] `patch_ref_size` is {cur_patch_size} at {mag}x when patching with {patch_size} at {patch_magnification}x.")
+
 		patch_time_elapsed = -1 # Default time
 		if patch:
-			current_patch_params.update({'patch_level': patch_level, 'patch_size': patch_size, 'step_size': step_size, 
+			current_patch_params.update({'patch_level': 0, 'patch_size': cur_patch_size, 'step_size': cur_step_size, 
 										 'save_path': patch_save_dir})
 			file_path, patch_time_elapsed = patching(WSI_object = WSI_object,  **current_patch_params,)
 		
@@ -223,16 +258,6 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		
 	return seg_times, patch_times
 
-"""
-python create_patches_fp.py 
-    --source DATA_DIRECTORY 
-    --save_dir RESULTS_DIRECTORY 
-    --patch_size 256 
-    --seg 
-    --patch 
-    --stitch
-"""
-
 parser = argparse.ArgumentParser(description='seg and patch')
 parser.add_argument('--source', type = str,
 					help='path to folder containing raw wsi image files')
@@ -249,11 +274,24 @@ parser.add_argument('--save_dir', type = str,
 					help='directory to save processed data')
 parser.add_argument('--preset', default=None, type=str,
 					help='predefined profile of default segmentation and filter parameters (.csv)')
-parser.add_argument('--patch_level', type=int, default=0, 
-					help='downsample level at which to patch')
+parser.add_argument('--patch_magnification', type=int, default=20, 
+					help='magnification at which to patch')
 parser.add_argument('--process_list',  type = str, default=None,
 					help='name of list of images to process with parameters (.csv)')
 parser.add_argument('--in_child_dir',  default=False, action='store_true')
+
+"""
+Example for use:
+	CUDA_VISIBLE_DEVICES=0 python3 create_patches_fp.py \
+		--source ${DIR_DATA} \
+		--save_dir ${DIR_SAVE_DATA}/tiles-l${LEVEL}-s${SIZE} \
+		--patch_size ${SIZE} \
+		--step_size ${SIZE} \
+		--preset tcga.csv \
+		--patch_magnification 20 \
+		--seg --patch \
+		--auto_skip --in_child_dir
+"""
 
 if __name__ == '__main__':
 	args = parser.parse_args()
@@ -264,14 +302,14 @@ if __name__ == '__main__':
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
-
 	else:
 		process_list = None
 
-	print('source: ', args.source)
-	print('patch_save_dir: ', patch_save_dir)
-	print('mask_save_dir: ', mask_save_dir)
-	print('stitch_save_dir: ', stitch_save_dir)
+	print("[info] Default path setup:")
+	print('\tsource: ', args.source)
+	print('\tpatch_save_dir: ', patch_save_dir)
+	print('\tmask_save_dir: ', mask_save_dir)
+	print('\tstitch_save_dir: ', stitch_save_dir)
 	
 	directories = {'source': args.source, 
 				   'save_dir': args.save_dir,
@@ -279,15 +317,20 @@ if __name__ == '__main__':
 				   'mask_save_dir' : mask_save_dir, 
 				   'stitch_save_dir': stitch_save_dir} 
 
-	for key, val in directories.items():
-		print("{} : {}".format(key, val))
-		if key not in ['source']:
-			os.makedirs(val, exist_ok=True)
+	os.makedirs(args.save_dir, exist_ok=True)
+	if args.save_mask:
+		os.makedirs(mask_save_dir, exist_ok=True)
+	if args.patch:
+		os.makedirs(patch_save_dir, exist_ok=True)
+	if args.stitch:
+		os.makedirs(stitch_save_dir, exist_ok=True)
 
+	# NOTE: we use TCGA preset parameters by default 
+	# it is kept the same as `https://github.com/mahmoodlab/CLAM/blob/master/presets/tcga.csv`
 	seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
 				  'keep_ids': 'none', 'exclude_ids': 'none'}
-	filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8}
-	vis_params = {'vis_level': -1, 'line_thickness': 250}
+	filter_params = {'a_t':16, 'a_h': 4, 'max_n_holes':8}
+	vis_params = {'vis_level': -1, 'line_thickness': 100}
 	patch_params = {'use_padding': True, 'contour_fn': 'four_pt'}
 
 	if args.preset:
@@ -309,11 +352,11 @@ if __name__ == '__main__':
 	 			  'patch_params': patch_params,
 				  'vis_params': vis_params}
 
-	print(parameters)
+	print("[info] Parameters to be used for creating patches:", parameters)
 
 	seg_times, patch_times = seg_and_patch(**directories, **parameters,
-											patch_size = args.patch_size, step_size=args.step_size, 
-											seg = args.seg,  use_default_params=False, save_mask = args.save_mask, 
-											stitch= args.stitch,
-											patch_level=args.patch_level, patch = args.patch,
-											process_list = process_list, auto_skip=args.auto_skip, in_child_dir=args.in_child_dir)
+											patch_size=args.patch_size, step_size=args.step_size, 
+											seg=args.seg, use_default_params=False, save_mask = args.save_mask, 
+											stitch=args.stitch,
+											patch_magnification=args.patch_magnification, patch=args.patch,
+											process_list=process_list, auto_skip=args.auto_skip, in_child_dir=args.in_child_dir)

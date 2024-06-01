@@ -29,12 +29,39 @@ class WholeSlideImage(object):
 
         self.name = ".".join(path.split("/")[-1].split('.')[:-1])
         self.wsi = openslide.open_slide(path)
+        self.magnification = self._read_magnification(self.wsi.properties)
         self.level_downsamples = self._assertLevelDownsamples()
         self.level_dim = self.wsi.level_dimensions
     
         self.contours_tissue = None
         self.contours_tumor = None
         self.hdf5_file = None
+
+    def _read_magnification(self, openslide_meta_data):
+        mag_obj = -1
+        if 'openslide.objective-power' in openslide_meta_data:
+            mag_obj = int(openslide_meta_data['openslide.objective-power'])
+
+        mag_mmp = -1
+        if 'openslide.mpp-x' in openslide_meta_data:
+            mmp = float(openslide_meta_data['openslide.mpp-x'])
+            if abs(mmp - 0.25) < 0.05:
+                mag_mmp = 40
+            elif abs(mmp - 0.5) < 0.05:
+                mag_mmp = 20
+            elif abs(mmp - 1.0) < 0.05:
+                mag_mmp = 10
+            elif abs(mmp - 2.0) < 0.05:
+                mag_mmp = 5
+
+        # use mag_obj at first
+        if mag_obj in [5, 10, 20, 40]:
+            return mag_obj
+
+        if mag_mmp in [5, 10, 20, 40]:
+            return mag_mmp
+
+        return -1
 
     def getOpenSlide(self):
         return self.wsi

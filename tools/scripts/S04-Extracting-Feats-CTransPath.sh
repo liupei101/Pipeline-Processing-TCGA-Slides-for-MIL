@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Sample patches of SIZE x SIZE at LEVEL 
-LEVEL=1
+# Sample patches of SIZE x SIZE at MAG (as used in S03)
+MAG=20
 SIZE=256
 
 # Path where CLAM is installed
@@ -13,7 +13,7 @@ DIR_RAW_DATA=/NAS02/RawData/tcga_rcc
 DIR_EXP_DATA=/NAS02/ExpData/tcga_rcc
 
 # Sub-directory to the patch coordinates generated from S03
-SUBDIR_READ=tiles-l${LEVEL}-s${SIZE}
+SUBDIR_READ=tiles-${MAG}x-s${SIZE}
 
 # Arch to be used for patch feature extraction (CONCH is strongly recommended)
 ARCH=CTransPath
@@ -24,7 +24,7 @@ ARCH=CTransPath
 MODEL_CKPT=/path/to/ctranspath/ctranspath.pth
 
 # Sub-directory to the patch features 
-SUBDIR_SAVE=feats-l${LEVEL}-s${SIZE}-${ARCH}
+SUBDIR_SAVE=${SUBDIR_READ}/feats-${ARCH}
 
 cd ${DIR_REPO}
 
@@ -36,6 +36,7 @@ CUDA_VISIBLE_DEVICES=0 python3 extract_features_fp.py \
     --data_slide_dir ${DIR_RAW_DATA} \
     --csv_path ${DIR_EXP_DATA}/${SUBDIR_READ}/process_list_autogen.csv \
     --feat_dir ${DIR_EXP_DATA}/${SUBDIR_SAVE} \
+    --target_patch_size ${SIZE} \
     --batch_size 128 \
     --slide_ext .svs \
     --slide_in_child_dir

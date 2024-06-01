@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-# Sample patches of SIZE x SIZE at LEVEL 
-LEVEL=1
+# Sample patches of SIZE x SIZE at a specified magnification (MAG)
+# Typical MAG is 20 (~0.5 MMP); it can also be set to 10 (~1 MMP) or 5 (~2 MMP)
+MAG=20
 SIZE=256
 
 # Path where CLAM is installed
@@ -17,10 +18,10 @@ cd ${DIR_REPO}
 echo "run seg & patching for all slides"
 CUDA_VISIBLE_DEVICES=0 python3 create_patches_fp.py \
     --source ${DIR_READ} \
-    --save_dir ${DIR_SAVE}/tiles-l${LEVEL}-s${SIZE} \
+    --save_dir ${DIR_SAVE}/tiles-${MAG}x-s${SIZE} \
     --patch_size ${SIZE} \
     --step_size ${SIZE} \
     --preset tcga.csv \
-    --patch_level ${LEVEL} \
-    --seg --patch --stitch \
-    --in_child_dir
+    --patch_magnification ${MAG} \
+    --seg --patch --stitch --save_mask \
+    --auto_skip --in_child_dir

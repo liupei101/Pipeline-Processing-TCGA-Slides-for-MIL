@@ -3,11 +3,17 @@
 [[Overview]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#overview) | [[Walkthrough]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#walkthrough) | [[Acknowledgement]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#acknowledgement) | [[Citation]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#citation)
 
 📚 Recent updates:
+- 24/06/01: add new features: allowing users to specify **a unified magnification** for patching and feature extraction
 - 24/05/08: update codes & readme
 
 ## Overview
 
-This repo provides **a complete and detailed tutorial** for users who intend to **process TCGA Whole-Slide Images (WSIs) for downstream computational tasks**, such as WSI classification and survival analysis (basically with multiple-instance learning (MIL) as the learning paradigm). Most functionalities of this repo are inherited from [CLAM](https://github.com/mahmoodlab/CLAM). 
+This repo provides **a complete and detailed tutorial** for users who intend to **process TCGA Whole-Slide Images (WSIs) for downstream computational tasks**, such as WSI classification and survival analysis (basically with multiple-instance learning (MIL) as the learning paradigm). 
+
+Moreover, this repo also provides [an improved version](./tools/CLAM) of original [CLAM](https://github.com/mahmoodlab/CLAM). This improvoed version has more practical features, e.g., 
+- allowing users to **specify a unified magnification** for patching and feature extractiong,
+- **patch-level image transformations** for model rubostness test, e.g. Gaussian bluring and stain variation.
+- **diverse architectures / networks** for patch feature extracting
 
 💡 A quick overview of what convenience this repo could provide for you is given as follows:
 - **Step-by-step instructions to download complete TCGA data**, including WSIs and corresponding label of interest. This is not presented in CLAM.

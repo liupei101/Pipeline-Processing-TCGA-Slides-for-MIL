@@ -24,7 +24,7 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
     batch_size = 8, verbose = 0, print_every=20, imagenet_pretrained=True, 
     custom_downsample=1, target_patch_size=-1, sampler_setting=None, custom_transforms=None,
     color_normalizer=None, color_augmenter=None, add_patch_noise=None, vertical_flip=False, 
-    enable_direct_transforms=False, save_h5_path=None, **kws):
+    save_h5_path=None, **kws):
     """
     args:
         arch: the name of model to use
@@ -41,14 +41,13 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
         color_normalizer: normalization for color space of pathology images
         color_augmenter: color augmentation for patch images
         add_patch_noise: adding noise to patch images
-        enable_direct_transforms: only using custom transforms for patch images 
         save_h5_path: path to save features as h5 files
     """
     dataset = Whole_Slide_Bag_FP(file_path=file_path, wsi=wsi, imagenet_pretrained=imagenet_pretrained, 
         custom_downsample=custom_downsample, target_patch_size=target_patch_size, 
         sampler_setting=sampler_setting, color_normalizer=color_normalizer, 
         color_augmenter=color_augmenter, add_patch_noise=add_patch_noise, 
-        vertical_flip=vertical_flip, custom_transforms=custom_transforms, enable_direct_transforms=enable_direct_transforms)
+        vertical_flip=vertical_flip, custom_transforms=custom_transforms)
     kwargs = {'num_workers': 4, 'pin_memory': True} if device.type == "cuda" else {}   #num_workers 4->0
     loader = DataLoader(dataset=dataset, batch_size=batch_size, **kwargs, collate_fn=collate_features)
 
@@ -149,8 +148,7 @@ parser.add_argument('--feat_dir', type=str, default=None)
 parser.add_argument('--batch_size', type=int, default=256)
 parser.add_argument('--auto_skip', default=False, action='store_true')
 parser.add_argument('--custom_downsample', type=int, default=1)
-parser.add_argument('--init_patch_size', type=int, default=256)
-parser.add_argument('--target_patch_size', type=int, default=-1)
+parser.add_argument('--target_patch_size', type=int, default=256)
 parser.add_argument('--slide_in_child_dir', default=False, action='store_true')
 parser.add_argument('--sampler', default=None, type=str)
 parser.add_argument('--sampler_size', default=1000, type=int)
@@ -203,7 +201,6 @@ if __name__ == '__main__':
     print('loading model checkpoint of arch {} from {}'.format(args.arch, args.ckpt_path))
     args_imagenet_pretrained = True
     args_custom_transforms = None
-    args_enable_direct_transforms = False
     args_proj_to_contrast = args.proj_to_contrast == 'Y'
     if args.arch == 'RN50-B':
         model = resnet50_baseline(pretrained=True)
@@ -233,19 +230,17 @@ if __name__ == '__main__':
         args_imagenet_pretrained = False
         args_sampler = None
         args_custom_transforms = transforms.Compose([
-            transforms.ToPILImage(mode='RGB'),
             transforms.Resize(224),
             transforms.ToTensor(),
             transforms.Normalize(mean = (0.485, 0.456, 0.406), std = (0.229, 0.224, 0.225))
         ])
-        print(f"[warning] Due to the use of {args.arch}, your color_normalizer and patch sampler are forced to be None, not active.")
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     elif args.arch == 'OGCLIP':
         from models import clip
         model, preprocess = clip.load(args.clip_type, device=device, download_root=args.ckpt_path) # "ViT-B/32"
         color_normalizer = None
         args_imagenet_pretrained = False
         args_sampler = None
-        args_enable_direct_transforms = True
         args_custom_transforms = preprocess
         print(f"[warning] Due to the use of {args.arch}-{args.clip_type}, only using custom transforms and all other arguments are not active.")
     elif args.arch == 'CLIP':
@@ -255,7 +250,6 @@ if __name__ == '__main__':
         color_normalizer = None
         args_imagenet_pretrained = False
         args_sampler = None
-        args_enable_direct_transforms = True
         args_custom_transforms = processor
         print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     elif args.arch == 'PLIP':
@@ -265,7 +259,6 @@ if __name__ == '__main__':
         color_normalizer = None
         args_imagenet_pretrained = False
         args_sampler = None
-        args_enable_direct_transforms = True
         args_custom_transforms = processor
         print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     elif args.arch == 'CONCH':
@@ -273,12 +266,11 @@ if __name__ == '__main__':
         model, preprocess = create_model_from_pretrained(
             "conch_ViT-B-16", 
             checkpoint_path=args.ckpt_path,
-            force_image_size=args.init_patch_size,
+            force_image_size=args.target_patch_size,
         )
         color_normalizer = None
         args_imagenet_pretrained = False
         args_sampler = None
-        args_enable_direct_transforms = True
         args_custom_transforms = preprocess
         print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     else:
@@ -324,7 +316,7 @@ if __name__ == '__main__':
             model = model, batch_size = args.batch_size, verbose = 1, print_every = 20, imagenet_pretrained=args_imagenet_pretrained,
             custom_downsample=args.custom_downsample, target_patch_size=args.target_patch_size, sampler_setting=args_sampler,
             custom_transforms=args_custom_transforms, color_normalizer=color_normalizer, color_augmenter=color_augmenter,
-            add_patch_noise=args.patch_noise, vertical_flip=args.vertical_flip, enable_direct_transforms=args_enable_direct_transforms,
+            add_patch_noise=args.patch_noise, vertical_flip=args.vertical_flip, 
             save_h5_path=output_h5_path, proj_to_contrast=args_proj_to_contrast
         )
         time_elapsed = time.time() - time_start
