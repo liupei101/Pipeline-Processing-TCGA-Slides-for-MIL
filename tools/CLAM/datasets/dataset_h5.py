@@ -188,7 +188,7 @@ class Whole_Slide_Bag_FP(Dataset):
 		img = self.wsi.read_region(coord, self.patch_level, (self.patch_size, self.patch_size)).convert('RGB')
 		
 		# Resize image first according to the specified target patch size
-		if self.target_patch_size is not None and self.target_patch_size != self.patch_size:
+		if self.target_patch_size is not None and self.target_patch_size[0] != self.patch_size:
 			img = img.resize(self.target_patch_size)
 
 		if self.vertical_flip is True:

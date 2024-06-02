@@ -20,7 +20,9 @@ This repo provides **a complete and detailed tutorial** for users who intend to 
 - **Detailed steps to process WSIs**, including WSI segmentation & patching and patch feature extraction. Two notebooks are given to show the details that need to be noticed when using CLAM for WSI preprocessing.
 - **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), and [CONCH](https://github.com/mahmoodlab/CONCH).  
 
-📝 This repo is developed from [***PseMix***](https://github.com/liupei101/PseMix), previously. Now it has been moved out as an individual project for maintaining convenience. It is *on updating*. 
+📝 This repo is developed from [***PseMix***](https://github.com/liupei101/PseMix), previously. Now it has been moved out as an individual project for maintaining convenience. 
+
+*On updating*. Stay tuned!
 
 Feel free to post your issue in this repo if you encounter any problems.
 
