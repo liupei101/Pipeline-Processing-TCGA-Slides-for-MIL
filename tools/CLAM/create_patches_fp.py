@@ -81,13 +81,13 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		'contour_fn': np.full((len(df)), patch_params['contour_fn'])})
 
 	# NEW: record more information 
-    # magnification: the highest magnification of the slide (level=0)
-    # seg_ref_size: the default ref patch size (level=0) used in segmentation
-    # patch_ref_size: the ref patch size (level=0) used in patching
-    # patch_ref_step: the ref patch size (level=0) used in patching
-    for new_k in ['magnification', 'seg_ref_size', 'patch_ref_size', 'patch_ref_step']:
-        if new_k not in df.columns:
-            df.loc[:, new_k] = -1
+	# magnification: the highest magnification of the slide (level=0)
+	# seg_ref_size: the default ref patch size (level=0) used in segmentation
+	# patch_ref_size: the ref patch size (level=0) used in patching
+	# patch_ref_step: the ref patch size (level=0) used in patching
+	for new_k in ['magnification', 'seg_ref_size', 'patch_ref_size', 'patch_ref_step']:
+		if new_k not in df.columns:
+			df.loc[:, new_k] = -1
 
 	seg_times = 0.
 	patch_times = 0.
