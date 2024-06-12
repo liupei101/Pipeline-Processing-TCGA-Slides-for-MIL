@@ -56,10 +56,17 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
 
     proj_to_contrast = None if 'proj_to_contrast' not in kws else kws['proj_to_contrast']
     if proj_to_contrast is not None:
-        if not proj_to_contrast:
+        if proj_to_contrast == 'N':
             print("[warning] Image features will not be projected into VL contrastive space.")
-        else:
+        elif proj_to_contrast == 'Y':
             print("[info] Image features will be projected into VL contrastive space.")
+        elif proj_to_contrast in ['NY', 'YN']:
+            print("[info] Save both the image features projected and not projected into VL contrastive space.")
+            assert isinstance(output_path, tuple), f"Two output paths are expected for proj_to_contrast = {proj_to_contrast}."
+            if save_h5_path is not None:
+                assert isinstance(save_h5_path, tuple), f"Two save_h5 paths are expected for proj_to_contrast = {proj_to_contrast}."            
+        else:
+            raise ValueError(f"Invalid value of `proj_to_contrast` ({proj_to_contrast}).")
 
     all_feats = None
     all_coors = None
@@ -72,46 +79,69 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
             mini_bs = coords.shape[0]
             
             if arch == 'CONCH':
-                features = model.encode_image(
-                    batch, 
-                    proj_contrast=proj_to_contrast, # if use the image features in VL-contrastive space
-                    normalize=False
-                ).cpu() 
+                features = conch_encoder_image(model, batch, proj_to_contrast)
             elif arch == 'CLIP' or arch == 'PLIP':
-                features = hf_clip_encoder_image(
-                    model, 
-                    batch, 
-                    proj_contrast=proj_to_contrast  # if use the image features in VL-contrastive space
-                ).cpu()
+                features = hf_clip_encoder_image(model, batch, proj_to_contrast)
             elif arch == 'OGCLIP':
-                features = model.encode_image(
-                    batch,
-                    proj_contrast=proj_to_contrast  # if use the image features in VL-contrastive space
-                ).cpu()
+                features = clip_encoder_image(model, batch, proj_to_contrast)
             else:
-                features = model(batch).cpu()
+                features = model(batch)
+
+            features = features.cpu() if not isinstance(features, tuple) else (features[0].cpu(), features[1].cpu())
             
             if all_feats is None:
                 all_feats = features
                 all_coors = coords
             else:
-                all_feats = torch.cat([all_feats, features], axis=0)
+                if isinstance(all_feats, tuple) and isinstance(features, tuple):
+                    all_feats = (torch.cat([all_feats[0], features[0]], axis=0), torch.cat([all_feats[1], features[1]], axis=0))
+                else:
+                    all_feats = torch.cat([all_feats, features], axis=0)
+
                 all_coors = torch.cat([all_coors, coords], axis=0)
-            
     
-    print('features size: ', all_feats.shape)
-    torch.save(all_feats, output_path)
-    print('saved pt file: ', output_path)
+    if isinstance(all_feats, tuple):
+        print("two features' size:", all_feats[0].shape)
+        torch.save(all_feats[0], output_path[0])
+        torch.save(all_feats[1], output_path[1])
+        print("saved pt files:", output_path)
+    else:
+        print('features size:', all_feats.shape)
+        torch.save(all_feats, output_path)
+        print('saved pt file:', output_path)
     
     if save_h5_path is not None:
-        asset_dict = {'features': all_feats.numpy(), 'coords': all_coors.numpy()}
-        save_hdf5(save_h5_path, asset_dict, attr_dict= None, mode='w')
-        print('saved h5 file: ', save_h5_path)
+        if isinstance(all_feats, tuple):
+            asset_dict_0 = {'features': all_feats[0].numpy(), 'coords': all_coors.numpy()}
+            save_hdf5(save_h5_path[0], asset_dict_0, attr_dict=None, mode='w')
+            asset_dict_1 = {'features': all_feats[1].numpy(), 'coords': all_coors.numpy()}
+            save_hdf5(save_h5_path[1], asset_dict_1, attr_dict=None, mode='w')
+            print('saved h5 file:', save_h5_path)
+        else:
+            asset_dict = {'features': all_feats.numpy(), 'coords': all_coors.numpy()}
+            save_hdf5(save_h5_path, asset_dict, attr_dict=None, mode='w')
+            print('saved h5 file:', save_h5_path)
     
     return output_path
 
 @torch.no_grad()
-def hf_clip_encoder_image(hf_clip, batch, proj_contrast=True):
+def conch_encoder_image(conch_model, batch, proj_contrast='Y'):
+    # Use CONCH's built-in functions
+    vis_features = conch_model.visual.forward_no_head(batch, normalize=False)
+    
+    if proj_contrast == 'N':
+        image_features = vis_features
+
+    elif proj_contrast == 'Y':
+        image_features = conch_model.visual.forward_project(vis_features)
+
+    elif proj_contrast in ['NY', 'YN']:
+        image_features = (vis_features, conch_model.visual.forward_project(vis_features))
+
+    return image_features
+
+@torch.no_grad()
+def hf_clip_encoder_image(hf_clip, batch, proj_contrast='Y'):
     """
     This follows the implementation of HuggingFace - transformers
     """
@@ -129,13 +159,35 @@ def hf_clip_encoder_image(hf_clip, batch, proj_contrast=True):
 
     pooled_output = vision_outputs[1]  # pooled_output
     
-    if proj_contrast:
-        image_features = hf_clip.visual_projection(pooled_output)
-    else:
+    if proj_contrast == 'N':
         image_features = pooled_output
+
+    elif proj_contrast == 'Y':
+        image_features = hf_clip.visual_projection(pooled_output)
+
+    elif proj_contrast in ['NY', 'YN']:
+        image_features = (pooled_output, hf_clip.visual_projection(pooled_output))
 
     return image_features
 
+@torch.no_grad()
+def clip_encoder_image(clip_model, batch, proj_contrast='Y'):
+    # Use CLIP's built-in functions
+    vis_features = clip_model.encode_image(
+        batch, 
+        proj_contrast=False
+    )
+    
+    if proj_contrast == 'N':
+        image_features = vis_features
+
+    elif proj_contrast == 'Y':
+        image_features = vis_features @ clip_model.visual.proj
+
+    elif proj_contrast in ['NY', 'YN']:
+        image_features = (vis_features, vis_features @ clip_model.visual.proj)
+
+    return image_features
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
 parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH'], help='Choose which architecture to use for extracting features.')
@@ -145,6 +197,7 @@ parser.add_argument('--data_slide_dir', type=str, default=None)
 parser.add_argument('--slide_ext', type=str, default= '.svs')
 parser.add_argument('--csv_path', type=str, default=None)
 parser.add_argument('--feat_dir', type=str, default=None)
+parser.add_argument('--feat_dir_ext', type=str, default=None)
 parser.add_argument('--batch_size', type=int, default=256)
 parser.add_argument('--auto_skip', default=False, action='store_true')
 parser.add_argument('--custom_downsample', type=int, default=1)
@@ -161,7 +214,7 @@ parser.add_argument('--color_aug', default=None, type=str, help='Applying color 
 parser.add_argument('--patch_noise', default=None, type=str, help='Applying Guassian Blur to patch images.')
 parser.add_argument('--vertical_flip', default=False, action='store_true', help='Applying Vertical Flip to patch images.')
 parser.add_argument('--save_h5', default=False, action='store_true')
-parser.add_argument('--proj_to_contrast', type=str, default='Y', choices=['Y', 'N'], help='If projecting image features into VL contrast space.')
+parser.add_argument('--proj_to_contrast', type=str, default='Y', choices=['Y', 'N', 'YN', 'NY'], help='If projecting image features into VL contrast space.')
 parser.add_argument('--clip_type', default='ViT-B/32', type=str, help='used for specifying the CLIP model.')
 args = parser.parse_args()
 
@@ -174,12 +227,24 @@ if __name__ == '__main__':
         raise NotImplementedError('No csv_path is gotten.')
 
     bags_dataset = Dataset_All_Bags(csv_path)
-    
-    os.makedirs(args.feat_dir, exist_ok=True)
-    os.makedirs(os.path.join(args.feat_dir, 'pt_files'), exist_ok=True)
-    dest_files = os.listdir(os.path.join(args.feat_dir, 'pt_files'))
-    if args.save_h5:
-        os.makedirs(os.path.join(args.feat_dir, 'h5_files'), exist_ok=True)
+
+    # prepare directories to save patch features
+    args_proj_to_contrast = args.proj_to_contrast
+    if args_proj_to_contrast in ['YN', 'NY']:
+        assert args.feat_dir_ext is not None, f"Got proj_to_contrast ({args_proj_to_contrast}); please specify an extra directory to save features."
+        args_feat_dir = (args.feat_dir, args.feat_dir_ext)
+        for feat_dir in args_feat_dir:
+            os.makedirs(feat_dir, exist_ok=True)
+            os.makedirs(os.path.join(feat_dir, 'pt_files'), exist_ok=True)
+            if args.save_h5:
+                os.makedirs(os.path.join(feat_dir, 'h5_files'), exist_ok=True)
+        print(f"Dirs to save raw / projected feats: {args_feat_dir[0]} / {args_feat_dir[1]}.")
+    else:
+        args_feat_dir = args.feat_dir
+        os.makedirs(args_feat_dir, exist_ok=True)
+        os.makedirs(os.path.join(args_feat_dir, 'pt_files'), exist_ok=True)
+        if args.save_h5:
+            os.makedirs(os.path.join(args_feat_dir, 'h5_files'), exist_ok=True)
 
     # sampler method
     if args.sampler is None:
@@ -201,7 +266,6 @@ if __name__ == '__main__':
     print('loading model checkpoint of arch {} from {}'.format(args.arch, args.ckpt_path))
     args_imagenet_pretrained = True
     args_custom_transforms = None
-    args_proj_to_contrast = args.proj_to_contrast == 'Y'
     if args.arch == 'RN50-B':
         model = resnet50_baseline(pretrained=True)
     elif args.arch == 'RN50-F':
@@ -288,27 +352,42 @@ if __name__ == '__main__':
     for bag_candidate_idx in range(total):
         slide_name = bags_dataset[bag_candidate_idx].split(args.slide_ext)[0]
         slide_id = get_slide_id(slide_name, has_ext=False, in_child_dir=args.slide_in_child_dir)
-        bag_name = slide_id+'.h5'
+        bag_name = slide_id + '.h5'
         h5_file_path = os.path.join(args.data_h5_dir, 'patches', bag_name)
         
         if not os.path.exists(h5_file_path):
             print('skiped slide {}, h5 file not found'.format(slide_id))
             continue
         
-        slide_file_path = get_slide_fullpath(args.data_slide_dir, slide_name, 
-            in_child_dir=args.slide_in_child_dir) + args.slide_ext
+        slide_file_path = get_slide_fullpath(
+            args.data_slide_dir, slide_name, 
+            in_child_dir=args.slide_in_child_dir
+        ) + args.slide_ext
         print('\nprogress: {}/{}'.format(bag_candidate_idx, total))
         print(slide_id)
 
-        if args.auto_skip and slide_id+'.pt' in dest_files:
-            print('skipped {}'.format(slide_id))
-            continue 
+        # prepare save paths 
+        if isinstance(args_feat_dir, tuple):
+            output_pt_path = (os.path.join(args_feat_dir[0], 'pt_files', slide_id + '.pt'), os.path.join(args_feat_dir[1], 'pt_files', slide_id + '.pt'))
+            if args.save_h5:
+                output_h5_path = (os.path.join(args_feat_dir[0], 'h5_files', slide_id + '.h5'), os.path.join(args_feat_dir[1], 'h5_files', slide_id + '.h5'))
+            else:
+                output_h5_path = None
 
-        output_pt_path = os.path.join(args.feat_dir, 'pt_files', slide_id+'.pt')
-        if args.save_h5:
-            output_h5_path = os.path.join(args.feat_dir, 'h5_files', slide_id+'.h5')
+            if args.auto_skip and os.path.exists(output_pt_path[0]) and os.path.exists(output_pt_path[1]):
+                print('skipped {}'.format(slide_id))
+                continue
+
         else:
-            output_h5_path = None
+            output_pt_path = os.path.join(args_feat_dir, 'pt_files', slide_id+'.pt')
+            if args.save_h5:
+                output_h5_path = os.path.join(args_feat_dir, 'h5_files', slide_id+'.h5')
+            else:
+                output_h5_path = None
+
+            if args.auto_skip and os.path.exists(output_pt_path):
+                print('skipped {}'.format(slide_id))
+                continue
         
         time_start = time.time()
         wsi = openslide.open_slide(slide_file_path)
