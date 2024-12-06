@@ -126,8 +126,9 @@ class Whole_Slide_Bag_FP(Dataset):
 		self.color_augmenter = color_augmenter
 		self.add_patch_noise = add_patch_noise
 		self.vertical_flip = vertical_flip
-		
-		if custom_transforms is None:
+		self.hugging_face_format = False
+        
+        if custom_transforms is None:
 			self.roi_transforms = eval_transforms()
 		else:
 			self.roi_transforms = custom_transforms

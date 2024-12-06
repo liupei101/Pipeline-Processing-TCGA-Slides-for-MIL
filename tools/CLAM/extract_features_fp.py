@@ -190,7 +190,7 @@ def clip_encoder_image(clip_model, batch, proj_contrast='Y'):
     return image_features
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
-parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH'], help='Choose which architecture to use for extracting features.')
+parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH', 'UNI'], help='Choose which architecture to use for extracting features.')
 parser.add_argument('--ckpt_path', type=str, default=None, help='The checkpoint path for pretrained models.')
 parser.add_argument('--data_h5_dir', type=str, default=None)
 parser.add_argument('--data_slide_dir', type=str, default=None)
@@ -335,6 +335,15 @@ if __name__ == '__main__':
         color_normalizer = None
         args_imagenet_pretrained = False
         args_sampler = None
+        args_custom_transforms = preprocess
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
+    elif args.arch == 'UNI':
+        from models.uni import get_encoder
+        model, preprocess = get_encoder(enc_name='uni', assets_dir=osp.dirname(osp.dirname(args.ckpt_path)))
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_enable_direct_transforms = True
         args_custom_transforms = preprocess
         print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     else:
