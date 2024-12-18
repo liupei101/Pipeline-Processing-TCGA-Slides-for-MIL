@@ -3,7 +3,8 @@
 [[Overview]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#overview) | [[Walkthrough]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#walkthrough) | [[Acknowledgement]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#acknowledgement) | [[Citation]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#citation)
 
 📚 Recent updates:
-- 24/12/06: add a new feature extractor UNI
+- 24/12/18: add a new feature extractor `CONCH_v1.5` from [`TITAN`](https://github.com/mahmoodlab/TITAN)
+- 24/12/06: add a new feature extractor `UNI`
 - 24/06/01: add new features: allowing users to specify **a unified magnification** for patching and feature extraction
 - 24/05/08: update codes & readme
 
@@ -19,7 +20,7 @@ This repo provides **a complete and detailed tutorial** for users who intend to 
 💡 A quick overview of what convenience this repo could provide for you:
 - **Step-by-step instructions to download complete TCGA data**, including WSIs and corresponding label of interest. This is not presented in CLAM.
 - **Detailed steps to process WSIs**, including WSI segmentation & patching and patch feature extraction. Two notebooks are given to show the details that need to be noticed when using CLAM for WSI preprocessing.
-- **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), [UNI](https://github.com/mahmoodlab/UNI). and [CONCH](https://github.com/mahmoodlab/CONCH).  
+- **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), [UNI](https://github.com/mahmoodlab/UNI), [CONCH](https://github.com/mahmoodlab/CONCH), and [CONCH_v1.5](https://github.com/mahmoodlab/TITAN).
 
 📝 This repo is developed from [***PseMix***](https://github.com/liupei101/PseMix), previously. Now it has been moved out as an individual project for maintaining convenience. 
 
@@ -36,8 +37,8 @@ Feel free to post your issue in this repo if you encounter any problems.
 - S04: [Extracting patch features](./S04-Extracting-Patch-Features.ipynb). It shows you the complete procedures and results of patch feature extraction. 6+ pertained models are supported and can be easily used with this step. 
 
 📝 Some notes:
-- It is strongly recommended to use `CONCH`/`UNI` in patch feature extraction (S04)
-- If you cannot use `CONCH`/`UNI` due to limited access rights, `CTransPath` and `PLIP` are good alternatives (both are free for use). Their usage is provided in [tools/scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tree/main/tools/scripts).
+- It is strongly recommended to use `CONCH`/`UNI`/`CONCH_v1.5` in patch feature extraction (S04)
+- If you cannot use `CONCH`/`UNI`/`CONCH_v1.5` due to limited access rights, `CTransPath` and `PLIP` are good alternatives (both are free for use). Their usage is provided in [tools/scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tree/main/tools/scripts).
 - The `truncated ResNet50` and `ResNet18 w/ SimCL` are **NOT** recommended in patch feature extraction. 
 
 ## Acknowledgement
