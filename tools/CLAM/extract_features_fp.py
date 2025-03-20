@@ -55,7 +55,7 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
         print('processing {}: total of {} batches'.format(file_path,len(loader)))
 
     proj_to_contrast = None if 'proj_to_contrast' not in kws else kws['proj_to_contrast']
-    if arch in ['OGCLIP', 'CLIP', 'PLIP', 'CONCH'] and proj_to_contrast is not None:
+    if arch in ['OGCLIP', 'CLIP', 'PLIP', 'CONCH', 'MUSK'] and proj_to_contrast is not None:
         if proj_to_contrast == 'N':
             print("[warning] Image features will not be projected into VL contrastive space.")
         elif proj_to_contrast == 'Y':
@@ -80,6 +80,8 @@ def compute_w_loader(arch, file_path, output_path, wsi, model,
             
             if arch == 'CONCH':
                 features = conch_encoder_image(model, batch, proj_to_contrast)
+            elif arch == 'MUSK':
+                features = musk_encoder_image(model, batch, proj_to_contrast)
             elif arch == 'CLIP' or arch == 'PLIP':
                 features = hf_clip_encoder_image(model, batch, proj_to_contrast)
             elif arch == 'OGCLIP':
@@ -141,6 +143,26 @@ def conch_encoder_image(conch_model, batch, proj_contrast='Y'):
     return image_features
 
 @torch.no_grad()
+def musk_encoder_image(musk_model, batch, proj_contrast='Y'):
+    return_global = True
+    # Use MUSK's built-in functions
+    batch = batch.half() # float16 is used in MUSK
+    outputs = musk_model.beit3(visual_tokens=batch)
+    x = outputs["encoder_out"]
+    vis_features = x[:, 0, :] if return_global else x
+    
+    if proj_contrast == 'N':
+        image_features = vis_features
+
+    elif proj_contrast == 'Y':
+        image_features = musk_model.vision_head(vis_features)
+
+    elif proj_contrast in ['NY', 'YN']:
+        image_features = (vis_features, musk_model.vision_head(vis_features))
+
+    return image_features
+
+@torch.no_grad()
 def hf_clip_encoder_image(hf_clip, batch, proj_contrast='Y'):
     """
     This follows the implementation of HuggingFace - transformers
@@ -190,7 +212,7 @@ def clip_encoder_image(clip_model, batch, proj_contrast='Y'):
     return image_features
 
 parser = argparse.ArgumentParser(description='Feature Extraction')
-parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH', 'CONCH_v1.5', 'UNI'], help='Choose which architecture to use for extracting features.')
+parser.add_argument('--arch', type=str, default='CONCH', choices=['RN50-B', 'RN50-F', 'RN18-SimCL', 'ViT256-HIPT', 'CTransPath', 'OGCLIP', 'CLIP', 'PLIP', 'CONCH', 'CONCH_v1.5', 'UNI', 'MUSK'], help='Choose which architecture to use for extracting features.')
 parser.add_argument('--ckpt_path', type=str, default=None, help='The checkpoint path for pretrained models.')
 parser.add_argument('--data_h5_dir', type=str, default=None)
 parser.add_argument('--data_slide_dir', type=str, default=None)
@@ -364,10 +386,36 @@ if __name__ == '__main__':
         args_sampler = None
         args_custom_transforms = preprocess
         print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
+    elif args.arch == 'MUSK':
+        from timm.models import create_model
+        from timm.data.constants import IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
+        from models.musk import utils as musk_utils
+        from models.musk import modeling as musk_modeling
+        assert args.target_patch_size == 384, 'MUSH is used with 384x384 MUSK features'
+        # CKPT_PATH should be like "/path/to/musk/model.safetensors"
+        model_config = "musk_large_patch16_384"
+        model = create_model(model_config).eval()
+        musk_utils.load_model_and_may_interpolate(args.ckpt_path, model, 'model|module', '')
+        # Please make sure that you have download MUSK to `args.ckpt_path`, e.g., /path/to/musk
+        img_size = args.target_patch_size
+        preprocess = transforms.Compose([
+            transforms.Resize(img_size, interpolation=3, antialias=True),
+            transforms.CenterCrop((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=IMAGENET_INCEPTION_MEAN, std=IMAGENET_INCEPTION_STD)
+        ])
+        color_normalizer = None
+        args_imagenet_pretrained = False
+        args_sampler = None
+        args_custom_transforms = preprocess
+        print(f"[warning] Due to the use of {args.arch}, only using custom transforms and all other arguments are not active.")
     else:
         raise NotImplementedError("Please specify a valid architecture.")
 
-    model = model.to(device)
+    if args.arch == 'MUSK':
+        model = model.to(device, dtype=torch.float16)
+    else:
+        model = model.to(device)
     
     # print_network(model)
     if torch.cuda.device_count() > 1:

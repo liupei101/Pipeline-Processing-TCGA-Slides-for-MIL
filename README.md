@@ -3,6 +3,7 @@
 [[Overview]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#overview) | [[Walkthrough]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#walkthrough) | [[Acknowledgement]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#acknowledgement) | [[Citation]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#citation)
 
 📚 Recent updates:
+- 25/03/20: add a new feature extractor `MUSK` from [`MUSK`](https://github.com/lilab-stanford/MUSK)
 - 24/12/18: add a new feature extractor `CONCH_v1.5` from [`TITAN`](https://github.com/mahmoodlab/TITAN)
 - 24/12/06: add a new feature extractor `UNI`
 - 24/06/01: add new features: allowing users to specify **a unified magnification** for patching and feature extraction
@@ -17,10 +18,10 @@ This repo provides **a complete and detailed tutorial** for users who intend to 
 - **patch-level image transformations** for model rubostness test, e.g. Gaussian bluring and stain variation.
 - **diverse architectures / networks** for patch feature extracting
 
-💡 A quick overview of what convenience this repo could provide for you:
+💡 A quick overview of what this repo could provide for you:
 - **Step-by-step instructions to download complete TCGA data**, including WSIs and corresponding label of interest. This is not presented in CLAM.
 - **Detailed steps to process WSIs**, including WSI segmentation & patching and patch feature extraction. Two notebooks are given to show the details that need to be noticed when using CLAM for WSI preprocessing.
-- **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), [UNI](https://github.com/mahmoodlab/UNI), [CONCH](https://github.com/mahmoodlab/CONCH), and [CONCH_v1.5](https://github.com/mahmoodlab/TITAN).
+- **More alternative pretrained models for patch feature extraction**, currently with support of [truncated ResNet50 (CLAM)](https://github.com/mahmoodlab/CLAM), [ResNet18 w/ SimCL (DSMIL)](https://github.com/binli123/dsmil-wsi), [CTransPath](https://github.com/Xiyue-Wang/TransPath), [CLIP](https://github.com/openai/CLIP), [PLIP](https://github.com/PathologyFoundation/plip), [UNI](https://github.com/mahmoodlab/UNI), [CONCH](https://github.com/mahmoodlab/CONCH), [CONCH_v1.5](https://github.com/mahmoodlab/TITAN) and [MUSK](https://github.com/lilab-stanford/MUSK).
 
 📝 This repo is developed from [***PseMix***](https://github.com/liupei101/PseMix), previously. Now it has been moved out as an individual project for maintaining convenience. 
 
@@ -37,9 +38,10 @@ Feel free to post your issue in this repo if you encounter any problems.
 - S04: [Extracting patch features](./S04-Extracting-Patch-Features.ipynb). It shows you the complete procedures and results of patch feature extraction. 6+ pertained models are supported and can be easily used with this step. 
 
 📝 Some notes:
-- It is strongly recommended to use `CONCH`/`UNI`/`CONCH_v1.5` in patch feature extraction (S04)
-- If you cannot use `CONCH`/`UNI`/`CONCH_v1.5` due to limited access rights, `CTransPath` and `PLIP` are good alternatives (both are free for use). Their usage is provided in [tools/scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tree/main/tools/scripts).
-- The `truncated ResNet50` and `ResNet18 w/ SimCL` are **NOT** recommended in patch feature extraction. 
+- It is strongly recommended to use `CONCH`/`UNI`/`CONCH_v1.5`/`MUSK` in patch feature extraction (S04)
+- If you cannot use `CONCH`/`UNI`/`CONCH_v1.5`/`MUSK` due to limited access rights, `CTransPath` and `PLIP` are good alternatives (both are free for use). Their usage is provided in [tools/scripts](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL/tree/main/tools/scripts).
+- The `truncated ResNet50` and `ResNet18 w/ SimCL` are **NOT** recommended in patch feature extraction.
+- Having gotten familiar with the basics of WSI processing? You are recommended to visit [TRIDENT](https://github.com/mahmoodlab/TRIDENT) for more about WSI processing.
 
 ## Acknowledgement
 We thank [CLAM team](https://github.com/mahmoodlab/CLAM) for contributing such an efficient and easy-to-use tool for WSI preprocessing, and [TCGA team](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) for making WSI data publicly-available to facilitate research.
