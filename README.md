@@ -2,6 +2,8 @@
 
 [[Overview]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#overview) | [[Walkthrough]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#walkthrough) | [[Acknowledgement]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#acknowledgement) | [[Citation]](https://github.com/liupei101/Pipeline-Processing-TCGA-Slides-for-MIL?tab=readme-ov-file#citation)
 
+⚠️ Toolkit for computational pathology upgrades very quickly; users are strongly recommended to refer to [TRIDENT](https://github.com/mahmoodlab/TRIDENT) for more advanced toolkits. **This repo is archived and will not be maintained**. 
+
 📚 Recent updates:
 - 25/03/20: add a new feature extractor `MUSK` from [`MUSK`](https://github.com/lilab-stanford/MUSK)
 - 24/12/18: add a new feature extractor `CONCH_v1.5` from [`TITAN`](https://github.com/mahmoodlab/TITAN)
